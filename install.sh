@@ -88,7 +88,7 @@ else
   echo ""
   echo -e "  ${YELLOW}Informe o token de acesso ao registry (GitHub PAT).${RESET}"
   echo -e "  Gere em: ${CYAN}https://github.com/settings/tokens${RESET}  (escopo: read:packages)\n"
-  read -rp "  GHCR_TOKEN: " GHCR_TOKEN_INPUT
+  read -rp "  GHCR_TOKEN: " GHCR_TOKEN_INPUT </dev/tty
   echo ""
 
   cat > .env <<EOF
