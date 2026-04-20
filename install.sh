@@ -9,7 +9,7 @@
 set -euo pipefail
 
 BASE_URL="https://raw.githubusercontent.com/wislanmoraes/pgwatchai-client/main"
-INSTALL_DIR="${PGWATCH_DIR:-$HOME/pgwatchai}"
+INSTALL_DIR="${PGWATCH_DIR:-$PWD}"
 
 GREEN="\033[0;32m"; YELLOW="\033[1;33m"; RED="\033[0;31m"; CYAN="\033[0;36m"; RESET="\033[0m"
 info()    { echo -e "${GREEN}[INFO]${RESET}  $*"; }
