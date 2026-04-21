@@ -74,6 +74,23 @@ services:
       - backend
     restart: unless-stopped
 
+  # ── Updater (sidecar de atualização — sempre ativo) ──────────────────────
+  updater:
+    image: ghcr.io/wislanmoraes/pgwatchai-updater:${IMAGE_TAG:-latest}
+    container_name: pgwatch_updater
+    environment:
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY obrigatório}
+      DEPLOY_DIR: /deploy
+      GHCR_TOKEN: ${GHCR_TOKEN:-}
+      GHCR_USER:  ${GHCR_USER:-wislanmoraes}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - .:/deploy:ro
+    networks:
+      - pgwatch_internal
+    restart: unless-stopped
+    # Porta 8080 nunca exposta ao host — acessível via /updater/ no Nginx
+
   # ── WatchShell (ferramenta interativa — opcional) ─────────────────────────
   watchshell:
     image: ghcr.io/wislanmoraes/pgwatchai-watchshell:${IMAGE_TAG:-latest}
