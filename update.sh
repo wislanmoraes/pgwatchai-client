@@ -54,9 +54,11 @@ if [[ "${SKIP_SELF_UPDATE:-0}" != "1" ]] && [[ -t 0 ]] && command -v curl &>/dev
 fi
 
 # ── Auto-atualização do docker-compose.client.yml ────────────────────────────
+# Roda sempre (independente de SKIP_SELF_UPDATE) para garantir que novos
+# serviços (ex: updater sidecar) sejam adicionados ao compose do cliente.
 
 COMPOSE_URL="https://raw.githubusercontent.com/wislanmoraes/pgwatchai-client/main/docker-compose.client.yml"
-if [[ "${SKIP_SELF_UPDATE:-0}" != "1" ]] && command -v curl &>/dev/null; then
+if command -v curl &>/dev/null; then
   COMPOSE_TMP="$(mktemp)"
   if curl -fsSL "$COMPOSE_URL" -o "$COMPOSE_TMP" 2>/dev/null; then
     TARGET_COMPOSE="$SCRIPT_DIR/${COMPOSE_FILE:-docker-compose.client.yml}"
