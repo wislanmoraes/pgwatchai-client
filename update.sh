@@ -99,11 +99,11 @@ docker compose -f "$COMPOSE_FILE" up -d timescaledb backend
 
 info "Aguardando backend ficar saudável..."
 for i in $(seq 1 30); do
-  sleep 3
-  if curl -sf http://localhost/api/health >/dev/null 2>&1; then
+  if docker exec pgwatch_backend curl -sf http://localhost:8000/health >/dev/null 2>&1; then
     info "Backend saudável."
     break
   fi
+  sleep 3
   echo "  aguardando... ($i/30)"
 done
 
