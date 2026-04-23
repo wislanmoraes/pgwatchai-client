@@ -35,7 +35,12 @@ Clique em **Atualizar agora** ou execute no servidor:
 cd ~/pgwatchai && ./update.sh
 ```
 
-O script se auto-atualiza antes de executar — não é necessário baixar uma nova versão manualmente.
+A cada execução, o script realiza automaticamente:
+1. **Auto-atualização do próprio script** — baixa a versão mais recente do `update.sh`
+2. **Atualização do `docker-compose.client.yml`** — garante que novos serviços e configurações sejam aplicados
+3. **Pull e restart das imagens Docker** — atualiza o backend, frontend e demais containers
+
+Não é necessário baixar ou editar nenhum arquivo manualmente.
 
 ## Suporte
 
