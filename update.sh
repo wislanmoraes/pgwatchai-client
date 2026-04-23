@@ -7,7 +7,7 @@
 #    GHCR_TOKEN=ghp_xxx ./update.sh       # passando token inline
 #
 #  Ou sempre na versão mais recente, sem baixar nada localmente:
-#    curl -fsSL https://raw.githubusercontent.com/wislanmoraes/pgwatchai/main/update.sh | bash
+#    curl -fsSL https://raw.githubusercontent.com/wislanmoraes/pgwatchai-client/main/update.sh | bash
 #
 #  Variáveis de ambiente:
 #    GHCR_TOKEN   Personal Access Token com escopo read:packages
@@ -31,7 +31,7 @@ error()   { echo -e "${RED}[ERROR]${RESET} $*" >&2; }
 # Baixa a versão mais recente de si mesmo do GitHub antes de prosseguir.
 # Se executado via pipe (curl | bash), pula esta etapa automaticamente.
 
-SCRIPT_URL="https://raw.githubusercontent.com/wislanmoraes/pgwatchai/main/update.sh"
+SCRIPT_URL="https://raw.githubusercontent.com/wislanmoraes/pgwatchai-client/main/update.sh"
 SELF="$SCRIPT_DIR/update.sh"
 
 if [[ "${SKIP_SELF_UPDATE:-0}" != "1" ]] && [[ -t 0 ]] && command -v curl &>/dev/null; then
