@@ -10,6 +10,8 @@
 #    echo $GHCR_TOKEN | docker login ghcr.io -u SEU_USUARIO --password-stdin
 # ─────────────────────────────────────────────────────────────────────────────
 
+name: pgwatchai
+
 x-images: &registry ghcr.io/wislanmoraes
 
 services:
