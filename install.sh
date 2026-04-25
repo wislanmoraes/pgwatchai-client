@@ -98,6 +98,12 @@ info "docker daemon ✓"
 
 section "Preparando diretório"
 
+echo ""
+default "padrão: $INSTALL_DIR"
+read -rp "  Diretório de instalação [$INSTALL_DIR]: " INSTALL_DIR_INPUT </dev/tty
+INSTALL_DIR="${INSTALL_DIR_INPUT:-$INSTALL_DIR}"
+echo ""
+
 mkdir -p "$INSTALL_DIR"
 cd "$INSTALL_DIR"
 info "Diretório: $INSTALL_DIR"
