@@ -16,7 +16,7 @@
 set -euo pipefail
 
 BASE_URL="https://raw.githubusercontent.com/wislanmoraes/pgwatchai-client/main"
-INSTALL_DIR="${PGWATCH_DIR:-$HOME/pgwatchai}"
+INSTALL_DIR="${PGWATCH_DIR:-$PWD}"
 
 GREEN="\033[0;32m"; YELLOW="\033[1;33m"; RED="\033[0;31m"; CYAN="\033[0;36m"; DIM="\033[2m"; RESET="\033[0m"
 info()    { echo -e "${GREEN}[INFO]${RESET}  $*"; }
@@ -98,12 +98,6 @@ info "docker daemon ✓"
 
 section "Preparando diretório"
 
-echo ""
-default "padrão: $INSTALL_DIR"
-read -rp "  Diretório de instalação [$INSTALL_DIR]: " INSTALL_DIR_INPUT </dev/tty
-INSTALL_DIR="${INSTALL_DIR_INPUT:-$INSTALL_DIR}"
-echo ""
-
 mkdir -p "$INSTALL_DIR"
 cd "$INSTALL_DIR"
 info "Diretório: $INSTALL_DIR"
@@ -132,6 +126,9 @@ else
 
   echo ""
   echo -e "  Pressione ${CYAN}Enter${RESET} para aceitar o valor padrão indicado em ${CYAN}[colchetes]${RESET}."
+  echo ""
+  echo -e "  ${DIM}pgwatch-ai será instalado em: ${CYAN}${INSTALL_DIR}${RESET}"
+  echo -e "  ${DIM}(para instalar em outro local, execute o script a partir do diretório desejado)${RESET}"
   echo ""
 
   # ── GHCR Token (obrigatório) ──────────────────────────────────────────────
