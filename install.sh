@@ -134,7 +134,7 @@ else
   echo -e "  Escopo necessário: ${CYAN}read:packages${RESET}"
   echo ""
   while true; do
-    read -rp "  GHCR_TOKEN: " GHCR_TOKEN_INPUT
+    read -rp "  GHCR_TOKEN: " GHCR_TOKEN_INPUT </dev/tty
     [[ -n "$GHCR_TOKEN_INPUT" ]] && break
     echo -e "  ${RED}Token obrigatório.${RESET} Sem ele não é possível baixar as imagens."
   done
@@ -144,7 +144,7 @@ else
   echo -e "  ${CYAN}[OPCIONAL]${RESET} Porta do painel web"
   default "padrão: 80 — verificamos se já está em uso antes de continuar"
   while true; do
-    read -rp "  FRONTEND_PORT [80]: " FRONTEND_PORT_INPUT
+    read -rp "  FRONTEND_PORT [80]: " FRONTEND_PORT_INPUT </dev/tty
     FRONTEND_PORT="${FRONTEND_PORT_INPUT:-80}"
     if port_in_use "$FRONTEND_PORT"; then
       info "Porta ${FRONTEND_PORT} disponível ✓"
@@ -157,7 +157,7 @@ else
   # ── Chave de IA (opcional) ────────────────────────────────────────────────
   echo -e "  ${CYAN}[OPCIONAL]${RESET} Chave de API de IA (Anthropic, OpenAI ou Google)"
   default "pode ser configurada depois na interface"
-  read -rp "  ANTHROPIC_API_KEY [não configurado]: " ANTHROPIC_API_KEY_INPUT
+  read -rp "  ANTHROPIC_API_KEY [não configurado]: " ANTHROPIC_API_KEY_INPUT </dev/tty
   ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY_INPUT:-}"
   echo ""
 
