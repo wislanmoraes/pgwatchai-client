@@ -7,7 +7,7 @@
 #
 #  O script:
 #    1. Verifica pré-requisitos (Docker, Docker Compose, curl)
-#    2. Cria o diretório ~/pgwatchai  (ou $PGWATCH_DIR se definido)
+#    2. Cria arquivos no diretório atual  (ou $PGWATCH_DIR se definido)
 #    3. Baixa docker-compose.client.yml e update.sh
 #    4. Coleta configurações interativamente (com padrões inteligentes)
 #    5. Faz login no GHCR e sobe os containers
@@ -16,7 +16,7 @@
 set -euo pipefail
 
 BASE_URL="https://raw.githubusercontent.com/wislanmoraes/pgwatchai-client/main"
-INSTALL_DIR="${PGWATCH_DIR:-$HOME/pgwatchai}"
+INSTALL_DIR="${PGWATCH_DIR:-$PWD}"
 
 GREEN="\033[0;32m"; YELLOW="\033[1;33m"; RED="\033[0;31m"; CYAN="\033[0;36m"; DIM="\033[2m"; RESET="\033[0m"
 info()    { echo -e "${GREEN}[INFO]${RESET}  $*"; }
@@ -128,7 +128,7 @@ else
   echo -e "  Pressione ${CYAN}Enter${RESET} para aceitar o valor padrão indicado em ${CYAN}[colchetes]${RESET}."
   echo ""
   echo -e "  ${DIM}pgwatch-ai será instalado em: ${CYAN}${INSTALL_DIR}${RESET}"
-  echo -e "  ${DIM}(para instalar em outro local, defina: export PGWATCH_DIR=/caminho/desejado)${RESET}"
+  echo -e "  ${DIM}(para instalar em outro local: cd /outro/diretorio && curl ... | bash)${RESET}"
   echo ""
 
   # ── GHCR Token (obrigatório) ──────────────────────────────────────────────
