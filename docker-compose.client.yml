@@ -34,6 +34,11 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 5g
     # TimescaleDB nunca expõe porta para o host — acessível apenas internamente
 
   # ── Backend (FastAPI) ─────────────────────────────────────────────────────
@@ -62,6 +67,11 @@ services:
       timescaledb:
         condition: service_healthy
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1.5g
     # Backend nunca expõe porta para o host — acessível via nginx do frontend
 
   # ── Frontend (React + Nginx) ──────────────────────────────────────────────
@@ -75,6 +85,11 @@ services:
     depends_on:
       - backend
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512m
 
   # ── Updater (sidecar de atualização — sempre ativo) ──────────────────────
   updater:
@@ -91,6 +106,11 @@ services:
     networks:
       - pgwatch_internal
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 256m
     # Porta 8080 nunca exposta ao host — acessível via /updater/ no Nginx
 
   # ── WatchShell (ferramenta interativa — opcional) ─────────────────────────
@@ -102,6 +122,11 @@ services:
     networks:
       - pgwatch_internal
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 256m
 
 # ── Rede interna ─────────────────────────────────────────────────────────────
 networks:
