@@ -18,14 +18,14 @@ services:
 
   # ── Banco de dados (TimescaleDB) ──────────────────────────────────────────
   timescaledb:
-    image: timescale/timescaledb:latest-pg16
+    image: timescale/timescaledb:latest-pg18
     container_name: pgwatch_db
     environment:
       POSTGRES_USER:     ${DB_USER:-pgwatch}
       POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD obrigatório}
       POSTGRES_DB:       ${DB_NAME:-pgwatch_ai}
     volumes:
-      - timescaledb_data:/var/lib/postgresql/data
+      - timescaledb_data:/var/lib/postgresql
     networks:
       - pgwatch_internal
     healthcheck:
