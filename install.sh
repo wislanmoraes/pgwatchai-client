@@ -113,6 +113,51 @@ curl -fsSL "$BASE_URL/update.sh" -o update.sh
 chmod +x update.sh
 info "update.sh ✓"
 
+# ── Detectar instalação existente ────────────────────────────────────────────
+
+EXISTING_CONTAINERS=$(docker compose -f docker-compose.client.yml ps --quiet 2>/dev/null || true)
+
+if [[ -n "$EXISTING_CONTAINERS" ]] || docker volume ls --quiet 2>/dev/null | grep -q "timescaledb_data"; then
+  section "Instalação existente detectada"
+
+  if [[ "${PGWATCH_FRESH:-0}" == "1" ]]; then
+    REINSTALL=1
+  else
+    echo -e "  O pgwatch-ai já está instalado neste servidor."
+    echo ""
+    echo -e "  ${CYAN}[1]${RESET} Atualização normal    — mantém dados históricos de monitoramento"
+    echo -e "  ${CYAN}[2]${RESET} Reinstalação limpa    — ${RED}APAGA${RESET} dados de monitoramento e recria do zero"
+    echo -e "       ${DIM}(targets, usuários e alertas configurados são preservados)${RESET}"
+    echo ""
+    echo -e "  ${DIM}Dica: passe PGWATCH_FRESH=1 antes do curl para forçar reinstalação sem prompt.${RESET}"
+    echo ""
+    read -rp "  Escolha [1]: " INSTALL_CHOICE </dev/tty
+    INSTALL_CHOICE="${INSTALL_CHOICE:-1}"
+    [[ "$INSTALL_CHOICE" == "2" ]] && REINSTALL=1 || REINSTALL=0
+  fi
+
+  if [[ "${REINSTALL:-0}" == "1" ]]; then
+    warn "Removendo instalação anterior (containers + volumes)..."
+    docker compose -f docker-compose.client.yml down -v 2>/dev/null || true
+
+    warn "Removendo imagens antigas do pgwatch-ai..."
+    docker images --format '{{.Repository}}:{{.Tag}} {{.ID}}' \
+      | grep 'ghcr.io/wislanmoraes/pgwatchai' \
+      | awk '{print $2}' \
+      | xargs -r docker rmi -f 2>/dev/null || true
+
+    warn "Limpando imagens sem tag (dangling)..."
+    docker image prune -f 2>/dev/null || true
+
+    info "Instalação anterior removida ✓"
+    echo ""
+  else
+    info "Executando atualização normal..."
+    SKIP_SELF_UPDATE=1 bash update.sh
+    exit 0
+  fi
+fi
+
 # ── Configurar .env ───────────────────────────────────────────────────────────
 
 section "Configurando variáveis de ambiente"

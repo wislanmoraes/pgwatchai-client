@@ -42,6 +42,24 @@ A cada execução, o script realiza automaticamente:
 
 Não é necessário baixar ou editar nenhum arquivo manualmente.
 
+## Reinstalação limpa
+
+Em atualizações que exijam apagar os dados históricos (ex: mudança de versão do PostgreSQL),
+execute o instalador novamente — ele detectará a instalação existente e oferecerá a opção de reinstalar:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/wislanmoraes/pgwatchai-client/main/install.sh | bash
+```
+
+Escolha a opção **[2] Reinstalação limpa** no menu. Os dados de monitoramento serão apagados,
+mas o arquivo `.env` (token, senhas, porta) é preservado — não é necessário reconfigurar.
+
+Para ambientes automatizados (sem prompt interativo):
+
+```bash
+PGWATCH_FRESH=1 curl -fsSL https://raw.githubusercontent.com/wislanmoraes/pgwatchai-client/main/install.sh | bash
+```
+
 ## Suporte
 
 Em caso de dúvidas, entre em contato com o suporte técnico.
