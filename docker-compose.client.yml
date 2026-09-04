@@ -20,6 +20,14 @@ services:
   timescaledb:
     image: timescale/timescaledb:latest-pg18
     container_name: pgwatch_db
+    # Issue #57: pg_stat_statements no banco INTERNO — telemetria do próprio
+    # backend, além da que já existe pras instâncias monitoradas. Ver
+    # docker-compose.dev.yml pro comentário completo.
+    command: [
+      "postgres",
+      "-c", "shared_preload_libraries=timescaledb,pg_stat_statements",
+      "-c", "pg_stat_statements.track=all"
+    ]
     environment:
       POSTGRES_USER:     ${DB_USER:-pgwatch}
       POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD obrigatório}
