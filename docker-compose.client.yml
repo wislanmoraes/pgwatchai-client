@@ -14,11 +14,29 @@ name: pgwatchai
 
 x-images: &registry ghcr.io/wislanmoraes
 
+# Hardening comum reaproveitado por todo serviço abaixo (âncora YAML) —
+# no-new-privileges bloqueia escalonamento via setuid/setcap mesmo que o
+# processo dentro do container tente; log rotation evita que uma instalação
+# "sobe e esquece" por meses encha o disco do parceiro com json-file sem limite.
+x-hardening: &hardening
+  security_opt:
+    - no-new-privileges:true
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
 services:
 
   # ── Banco de dados (TimescaleDB) ──────────────────────────────────────────
   timescaledb:
-    image: timescale/timescaledb:latest-pg18
+    <<: *hardening
+    # Pinada (era latest-pg18) — uma troca silenciosa de versão major/minor
+    # do TimescaleDB num `docker compose pull` pode quebrar coisas que
+    # dependem de versão exata (ex.: compressão nativa, Issue #55/#57).
+    # Validado contra esta versão nos ambientes de dev e produção do projeto.
+    image: timescale/timescaledb:2.27.2-pg18
     container_name: pgwatch_db
     # Issue #57: pg_stat_statements no banco INTERNO — telemetria do próprio
     # backend, além da que já existe pras instâncias monitoradas. Ver
@@ -51,6 +69,7 @@ services:
 
   # ── Backend (FastAPI) ─────────────────────────────────────────────────────
   backend:
+    <<: *hardening
     image: ghcr.io/wislanmoraes/pgwatchai-backend:${IMAGE_TAG:-latest}
     container_name: pgwatch_backend
     user: root   # necessário para acessar /var/run/docker.sock (WatchShell)
@@ -65,15 +84,26 @@ services:
       WATCHSHELL_IMAGE: ghcr.io/wislanmoraes/pgwatchai-watchshell:${IMAGE_TAG:-latest}
       GHCR_USER:  ${GHCR_USER:-wislanmoraes}
       GHCR_TOKEN: ${GHCR_TOKEN:-}
-      HOST_DEPLOY_DIR: /host_deploy
     volumes:
+      # Achado numa revisão de segurança: o backend NUNCA lê/escreve nada
+      # do diretório de deploy no código real (routers/updates.py) — ele só
+      # inspeciona o PRÓPRIO container via socket e delega qualquer apply/
+      # rollback pro sidecar `updater` via HTTP (http://updater:8080/...).
+      # O antigo `.:/host_deploy:ro` montava o diretório INTEIRO — incluindo
+      # o .env com DB_PASSWORD/SECRET_KEY/GHCR_TOKEN em texto puro — sem
+      # necessidade nenhuma. Removido; só o socket continua preciso.
       - /var/run/docker.sock:/var/run/docker.sock  # necessário para WatchShell / terminal
-      - .:/host_deploy:ro                          # update.sh + compose file acessíveis pelo backend
     networks:
       - pgwatch_internal
     depends_on:
       timescaledb:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     restart: unless-stopped
     deploy:
       resources:
@@ -84,6 +114,7 @@ services:
 
   # ── Frontend (React + Nginx) ──────────────────────────────────────────────
   frontend:
+    <<: *hardening
     image: ghcr.io/wislanmoraes/pgwatchai-frontend:${IMAGE_TAG:-latest}
     container_name: pgwatch_frontend
     ports:
@@ -92,6 +123,12 @@ services:
       - pgwatch_internal
     depends_on:
       - backend
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     restart: unless-stopped
     deploy:
       resources:
@@ -101,6 +138,7 @@ services:
 
   # ── Updater (sidecar de atualização — sempre ativo) ──────────────────────
   updater:
+    <<: *hardening
     image: ghcr.io/wislanmoraes/pgwatchai-updater:${IMAGE_TAG:-latest}
     container_name: pgwatch_updater
     environment:
@@ -110,9 +148,41 @@ services:
       GHCR_USER:  ${GHCR_USER:-wislanmoraes}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - .:/deploy:ro
+      # Achado numa revisão de segurança: o `.:/deploy:ro` antigo montava o
+      # diretório inteiro (incluindo .env com os 3 segredos) só pra
+      # update.sh precisar de 3 arquivos específicos. Trocado por bind mounts
+      # individuais — reduz o que fica exposto dentro do container ao
+      # estritamente necessário:
+      #   .env                      → `docker compose` precisa dele no cwd
+      #                                pra interpolar ${DB_PASSWORD} etc.
+      #                                ao rodar `up`/`pull` dentro do sidecar.
+      #   update.sh                 → é o script que o sidecar executa
+      #                                (main.py roda `bash update.sh` com
+      #                                cwd=/deploy). Fica :ro porque o
+      #                                sidecar sempre roda com
+      #                                SKIP_SELF_UPDATE=1 — nunca tenta se
+      #                                sobrescrever nesse caminho.
+      #   docker-compose.client.yml → PRECISA ser gravável (sem :ro): o
+      #                                bloco de auto-atualização do compose
+      #                                em update.sh roda incondicionalmente
+      #                                (não respeita SKIP_SELF_UPDATE) e faz
+      #                                `mv` sobre este arquivo sempre que a
+      #                                versão no GitHub mudar — com :ro isso
+      #                                falhava com "Read-only file system" e
+      #                                abortava a atualização inteira antes
+      #                                até de chegar no `docker compose pull`
+      #                                (bug real, achado nesta revisão).
+      - ./.env:/deploy/.env:ro
+      - ./update.sh:/deploy/update.sh:ro
+      - ./docker-compose.client.yml:/deploy/docker-compose.client.yml
     networks:
       - pgwatch_internal
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     restart: unless-stopped
     deploy:
       resources:
@@ -123,6 +193,7 @@ services:
 
   # ── WatchShell (ferramenta interativa — opcional) ─────────────────────────
   watchshell:
+    <<: *hardening
     image: ghcr.io/wislanmoraes/pgwatchai-watchshell:${IMAGE_TAG:-latest}
     container_name: pgwatch_watchshell
     profiles:
