@@ -38,13 +38,17 @@ services:
     # Validado contra esta versão nos ambientes de dev e produção do projeto.
     image: timescale/timescaledb:2.27.2-pg18
     container_name: pgwatch_db
-    # Issue #57: pg_stat_statements no banco INTERNO — telemetria do próprio
-    # backend, além da que já existe pras instâncias monitoradas. Ver
-    # docker-compose.dev.yml pro comentário completo.
+    # Issue #57/#61: pg_stat_statements + auto_explain (limiar 10ms) no banco
+    # INTERNO — telemetria do próprio backend, além da que já existe pras
+    # instâncias monitoradas. Ver docker-compose.dev.yml (repo privado) pro
+    # comentário completo sobre a escolha do limiar de 10ms.
     command: [
       "postgres",
-      "-c", "shared_preload_libraries=timescaledb,pg_stat_statements",
-      "-c", "pg_stat_statements.track=all"
+      "-c", "shared_preload_libraries=timescaledb,pg_stat_statements,auto_explain",
+      "-c", "pg_stat_statements.track=all",
+      "-c", "auto_explain.log_min_duration=10ms",
+      "-c", "auto_explain.log_analyze=off",
+      "-c", "auto_explain.log_format=text"
     ]
     environment:
       POSTGRES_USER:     ${DB_USER:-pgwatch}
