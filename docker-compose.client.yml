@@ -144,6 +144,13 @@ services:
     environment:
       SECRET_KEY: ${SECRET_KEY:?SECRET_KEY obrigatório}
       DEPLOY_DIR: /deploy
+      # Caminho REAL no host (não o /deploy interno do container) — o `docker
+      # compose` client-side resolve ${PWD} usando o cwd de QUEM RODA este
+      # `up` (install.sh/update.sh no host), então isso captura corretamente
+      # o diretório de deploy verdadeiro. Necessário pro update.sh conseguir
+      # recriar o próprio updater via um container auxiliar (ver update.sh
+      # para o comentário completo sobre por que isso importa).
+      HOST_DEPLOY_DIR: ${PWD}
       GHCR_TOKEN: ${GHCR_TOKEN:-}
       GHCR_USER:  ${GHCR_USER:-wislanmoraes}
     volumes:

@@ -10,10 +10,19 @@
 #    curl -fsSL https://raw.githubusercontent.com/wislanmoraes/pgwatchai-client/main/update.sh | bash
 #
 #  Variáveis de ambiente:
-#    GHCR_TOKEN   Personal Access Token com escopo read:packages
-#    GHCR_USER    Usuário GitHub (padrão: wislanmoraes)
-#    COMPOSE_FILE Arquivo compose (padrão: docker-compose.client.yml)
+#    GHCR_TOKEN       Personal Access Token com escopo read:packages
+#    GHCR_USER        Usuário GitHub (padrão: wislanmoraes)
+#    COMPOSE_FILE     Arquivo compose (padrão: docker-compose.client.yml)
+#    HOST_DEPLOY_DIR  Caminho REAL no host do diretório de deploy (setado
+#                      automaticamente pelo compose via ${PWD} na criação do
+#                      updater) — necessário pra ele recriar a si mesmo.
 #    SKIP_SELF_UPDATE=1  Desativa a auto-atualização deste script
+#
+#  Nota pra instalações de ANTES desta variável existir: a primeira
+#  atualização depois de adotar isso ainda vai pedir um passo manual único
+#  (o updater atual em execução não tem HOST_DEPLOY_DIR) — depois disso,
+#  nunca mais precisa de intervenção manual:
+#    docker compose -f docker-compose.client.yml up -d --force-recreate updater
 # ─────────────────────────────────────────────────────────────────────────────
 
 set -euo pipefail
@@ -145,6 +154,50 @@ docker compose -f "$COMPOSE_FILE" up -d frontend
 info "Subindo demais serviços..."
 # --no-recreate: não recria containers já em execução (ex: pgwatch_updater que está rodando este script)
 docker compose -f "$COMPOSE_FILE" up -d --no-recreate --remove-orphans
+
+# ── Auto-recriação do updater ─────────────────────────────────────────────────
+# O updater nunca recria a si mesmo acima (--no-recreate, de propósito: é este
+# script rodando dentro dele). Isso significa que mudanças no próprio serviço
+# `updater` do compose (nova imagem, novos mounts, novo healthcheck) nunca se
+# aplicam sozinhas — historicamente exigiam um `docker compose up -d
+# --force-recreate updater` manual depois de toda atualização normal.
+#
+# Um "nohup/disown" comum não resolve: mata o processo pai, não o container —
+# e o container_name fixo (pgwatch_updater) obriga o Docker a parar/remover
+# ESTE container antes de criar o novo com o mesmo nome, matando qualquer
+# processo em background que ainda esteja dentro dele. A solução é delegar a
+# recriação a um container auxiliar descartável, completamente separado
+# deste (fala com o dockerd do host via socket, não depende do namespace
+# deste container pra sobreviver).
+#
+# Precisa de HOST_DEPLOY_DIR (o caminho REAL no host, não o /deploy interno
+# deste container) por dois motivos:
+#   1. o volume do auxiliar precisa apontar pro conteúdo de verdade;
+#   2. crucial: o auxiliar precisa montar esse caminho como working_dir
+#      usando A MESMA STRING que existe no host (não remapeado pra /deploy) —
+#      senão o `docker compose` que ele roda por dentro resolve os mounts
+#      relativos do compose (./.env, etc.) contra o PRÓPRIO cwd do processo,
+#      que o dockerd do host então tentaria interpretar nesse mesmo caminho
+#      NO HOST. Se não bater com a string real, ele monta um diretório vazio
+#      (ou falha, dependendo do SO) em vez do deploy de verdade. Testado e
+#      confirmado manualmente antes de ir pra produção.
+if [[ -z "${HOST_DEPLOY_DIR:-}" ]]; then
+  warn "HOST_DEPLOY_DIR não definido — pulando auto-recriação do updater."
+  warn "Instalações antigas (de antes desta variável existir) precisam de:"
+  warn "  docker compose -f $COMPOSE_FILE up -d --force-recreate updater"
+else
+  info "Agendando recriação do updater (em container auxiliar separado)..."
+  # sleep 2 dá tempo do `docker run -d` retornar e este script terminar
+  # (state.push_done() no updater dispara e a UI já reporta sucesso) antes
+  # do updater antigo ser efetivamente derrubado.
+  docker run --rm -d \
+    -v /var/run/docker.sock:/var/run/docker.sock \
+    -v "$HOST_DEPLOY_DIR:$HOST_DEPLOY_DIR" \
+    -w "$HOST_DEPLOY_DIR" \
+    docker:27-cli \
+    sh -c "sleep 2 && docker compose -f '$COMPOSE_FILE' up -d --force-recreate --no-deps updater" \
+    >/dev/null
+fi
 
 # ── Limpeza de imagens antigas ────────────────────────────────────────────────
 
