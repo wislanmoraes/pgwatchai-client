@@ -42,13 +42,18 @@ services:
     # INTERNO — telemetria do próprio backend, além da que já existe pras
     # instâncias monitoradas. Ver docker-compose.dev.yml (repo privado) pro
     # comentário completo sobre a escolha do limiar de 10ms.
+    # logging_collector=on + jsonlog: ver docker-compose.dev.yml (repo
+    # privado) pro comentário completo — log estruturado (Logs Brutos, aba
+    # Banco) em vez de texto livre quebrado em várias linhas.
     command: [
       "postgres",
       "-c", "shared_preload_libraries=timescaledb,pg_stat_statements,auto_explain",
       "-c", "pg_stat_statements.track=all",
       "-c", "auto_explain.log_min_duration=10ms",
       "-c", "auto_explain.log_analyze=off",
-      "-c", "auto_explain.log_format=text"
+      "-c", "auto_explain.log_format=text",
+      "-c", "logging_collector=on",
+      "-c", "log_destination=stderr,jsonlog"
     ]
     environment:
       POSTGRES_USER:     ${DB_USER:-pgwatch}
