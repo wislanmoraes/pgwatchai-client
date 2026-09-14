@@ -73,7 +73,18 @@ if command -v curl &>/dev/null; then
     TARGET_COMPOSE="$SCRIPT_DIR/${COMPOSE_FILE:-docker-compose.client.yml}"
     if ! cmp -s "$COMPOSE_TMP" "$TARGET_COMPOSE"; then
       info "docker-compose.client.yml atualizado."
-      mv "$COMPOSE_TMP" "$TARGET_COMPOSE"
+      # Achado ao vivo num cliente: este arquivo é montado no sidecar
+      # `updater` como bind mount de ARQUIVO ÚNICO (ver docker-compose.
+      # client.yml, serviço updater — precisa ser gravável, ao contrário de
+      # .env/update.sh que são :ro). `mv` faz um rename() atômico, que TROCA
+      # o inode do destino — o kernel recusa isso quando o caminho tem algo
+      # montado nele (exatamente o que um bind mount de arquivo é) e devolve
+      # EBUSY ("Resource busy"), abortando a atualização logo depois de
+      # baixar o compose novo, antes até do `docker compose pull`. `cat` (ou
+      # `cp` sem --remove-destination) escreve NO MESMO inode em vez de
+      # trocá-lo — compatível com esse tipo de bind mount.
+      cat "$COMPOSE_TMP" > "$TARGET_COMPOSE"
+      rm -f "$COMPOSE_TMP"
     else
       rm -f "$COMPOSE_TMP"
     fi
