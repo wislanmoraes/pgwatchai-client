@@ -27,7 +27,13 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# DEPLOY_DIR (setado pelo sidecar `updater`, ver updater/main.py
+# _fresh_update_script) tem prioridade sobre BASH_SOURCE: o sidecar busca
+# uma cópia FRESCA deste script em /tmp antes de cada execução (contorna o
+# bind mount :ro de update.sh e evita self-modificação de um script em
+# execução — ver Issue #74), então ${BASH_SOURCE[0]} apontaria pra /tmp, não
+# pra onde .env/docker-compose.client.yml realmente estão.
+SCRIPT_DIR="${DEPLOY_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 
 # ── Cores para output ─────────────────────────────────────────────────────────
 
