@@ -35,8 +35,19 @@ services:
     # Pinada (era latest-pg18) — uma troca silenciosa de versão major/minor
     # do TimescaleDB num `docker compose pull` pode quebrar coisas que
     # dependem de versão exata (ex.: compressão nativa, Issue #55/#57).
-    # Validado contra esta versão nos ambientes de dev e produção do projeto.
-    image: timescale/timescaledb:2.27.2-pg18
+    #
+    # Achado ao vivo (cliente): a primeira tentativa de pin (2.27.2) já
+    # nasceu quebrando quem tinha rodado :latest-pg18 antes desta linha
+    # existir e avançado além dela (extensão registrada em 2.29.2 no
+    # catálogo do banco) — CREATE EXTENSION IF NOT EXISTS nunca atualiza
+    # uma extensão já instalada, e a imagem 2.27.2 não tem mais o .so de
+    # releases mais novas. Resultado: backend trava no lifespan pra
+    # SEMPRE (não é transitório) até a imagem ser trocada de volta pra uma
+    # versão >= a já registrada. NUNCA reduza esta tag abaixo da mais alta
+    # já publicada aqui — só suba. (main.py roda ALTER EXTENSION UPDATE no
+    # boot, então subir a versão sempre migra os clientes pra frente
+    # sozinho; descer nunca vai funcionar, e trava instalações existentes.)
+    image: timescale/timescaledb:2.29.2-pg18
     container_name: pgwatch_db
     # Issue #57/#61: pg_stat_statements + auto_explain (limiar 10ms) no banco
     # INTERNO — telemetria do próprio backend, além da que já existe pras
