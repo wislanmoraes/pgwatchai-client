@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────────────
-#  pgwatch-ai — Script de atualização para parceiros
+#  pgwho — Script de atualização para parceiros
 #
 #  Uso:
 #    ./update.sh                          # usa variáveis de ambiente ou .env
 #    GHCR_TOKEN=ghp_xxx ./update.sh       # passando token inline
 #
 #  Ou sempre na versão mais recente, sem baixar nada localmente:
-#    curl -fsSL https://raw.githubusercontent.com/wislanmoraes/pgwatchai-client/main/update.sh | bash
+#    curl -fsSL https://raw.githubusercontent.com/wislanmoraes/pgwho-client/main/update.sh | bash
 #
 #  Variáveis de ambiente:
 #    GHCR_TOKEN       Personal Access Token com escopo read:packages
@@ -46,7 +46,7 @@ error()   { echo -e "${RED}[ERROR]${RESET} $*" >&2; }
 # Baixa a versão mais recente de si mesmo do GitHub antes de prosseguir.
 # Se executado via pipe (curl | bash), pula esta etapa automaticamente.
 
-SCRIPT_URL="https://raw.githubusercontent.com/wislanmoraes/pgwatchai-client/main/update.sh"
+SCRIPT_URL="https://raw.githubusercontent.com/wislanmoraes/pgwho-client/main/update.sh"
 SELF="$SCRIPT_DIR/update.sh"
 
 if [[ "${SKIP_SELF_UPDATE:-0}" != "1" ]] && [[ -t 0 ]] && command -v curl &>/dev/null; then
@@ -72,7 +72,7 @@ fi
 # Roda sempre (independente de SKIP_SELF_UPDATE) para garantir que novos
 # serviços (ex: updater sidecar) sejam adicionados ao compose do cliente.
 
-COMPOSE_URL="https://raw.githubusercontent.com/wislanmoraes/pgwatchai-client/main/docker-compose.client.yml"
+COMPOSE_URL="https://raw.githubusercontent.com/wislanmoraes/pgwho-client/main/docker-compose.client.yml"
 if command -v curl &>/dev/null; then
   COMPOSE_TMP="$(mktemp)"
   if curl -fsSL "$COMPOSE_URL" -o "$COMPOSE_TMP" 2>/dev/null; then
@@ -136,6 +136,15 @@ else
   warn "GHCR_TOKEN não definido — assumindo que já está logado no $REGISTRY."
 fi
 
+# ── Preservação automática de volume (migração pgwatchai -> pgwho) ────────────
+if [[ -z "${DATA_VOLUME_NAME:-}" ]] && docker volume inspect pgwatchai_timescaledb_data >/dev/null 2>&1; then
+  export DATA_VOLUME_NAME="pgwatchai_timescaledb_data"
+  if [[ -f "$SCRIPT_DIR/.env" ]] && ! grep -q '^DATA_VOLUME_NAME=' "$SCRIPT_DIR/.env"; then
+    echo "DATA_VOLUME_NAME=pgwatchai_timescaledb_data" >> "$SCRIPT_DIR/.env"
+    info "Volume legado (pgwatchai_timescaledb_data) detectado e preservado no .env."
+  fi
+fi
+
 # ── Baixar novas imagens ──────────────────────────────────────────────────────
 
 info "Baixando novas imagens..."
@@ -146,8 +155,8 @@ docker compose -f "$COMPOSE_FILE" --profile tools pull watchshell
 # ── Reiniciar serviços ────────────────────────────────────────────────────────
 
 info "Parando containers existentes (mantendo frontend no ar)..."
-docker stop pgwatch_backend pgwatch_watchshell pgwatch_db 2>/dev/null || true
-docker rm   pgwatch_backend pgwatch_watchshell pgwatch_db 2>/dev/null || true
+docker stop pgwho_backend pgwho_watchshell pgwho_db pgwatch_backend pgwatch_watchshell pgwatch_db 2>/dev/null || true
+docker rm   pgwho_backend pgwho_watchshell pgwho_db pgwatch_backend pgwatch_watchshell pgwatch_db 2>/dev/null || true
 
 info "Subindo banco e backend com as novas imagens..."
 # depends_on: timescaledb: condition: service_healthy garante a ordem correta
@@ -156,7 +165,7 @@ docker compose -f "$COMPOSE_FILE" up -d timescaledb backend
 info "Aguardando backend ficar saudável..."
 for i in $(seq 1 30); do
   sleep 3
-  if docker exec pgwatch_backend curl -sf http://localhost:8000/health >/dev/null 2>&1; then
+  if docker exec pgwho_backend curl -sf http://localhost:8000/health >/dev/null 2>&1; then
     info "Backend saudável."
     break
   fi
@@ -164,12 +173,12 @@ for i in $(seq 1 30); do
 done
 
 info "Atualizando frontend..."
-docker stop pgwatch_frontend 2>/dev/null || true
-docker rm   pgwatch_frontend 2>/dev/null || true
+docker stop pgwho_frontend pgwatch_frontend 2>/dev/null || true
+docker rm   pgwho_frontend pgwatch_frontend 2>/dev/null || true
 docker compose -f "$COMPOSE_FILE" up -d frontend
 
 info "Subindo demais serviços..."
-# --no-recreate: não recria containers já em execução (ex: pgwatch_updater que está rodando este script)
+# --no-recreate: não recria containers já em execução (ex: pgwho_updater que está rodando este script)
 docker compose -f "$COMPOSE_FILE" up -d --no-recreate --remove-orphans
 
 # ── Auto-recriação do updater ─────────────────────────────────────────────────
@@ -180,7 +189,7 @@ docker compose -f "$COMPOSE_FILE" up -d --no-recreate --remove-orphans
 # --force-recreate updater` manual depois de toda atualização normal.
 #
 # Um "nohup/disown" comum não resolve: mata o processo pai, não o container —
-# e o container_name fixo (pgwatch_updater) obriga o Docker a parar/remover
+# e o container_name fixo (pgwho_updater) obriga o Docker a parar/remover
 # ESTE container antes de criar o novo com o mesmo nome, matando qualquer
 # processo em background que ainda esteja dentro dele. A solução é delegar a
 # recriação a um container auxiliar descartável, completamente separado
@@ -212,7 +221,7 @@ else
     -v "$HOST_DEPLOY_DIR:$HOST_DEPLOY_DIR" \
     -w "$HOST_DEPLOY_DIR" \
     docker:27-cli \
-    sh -c "sleep 2 && docker compose -f '$COMPOSE_FILE' up -d --force-recreate --no-deps updater" \
+    sh -c "sleep 2 && docker rm -f pgwatch_updater 2>/dev/null || true; docker compose -f '$COMPOSE_FILE' up -d --force-recreate --no-deps updater" \
     >/dev/null
 fi
 

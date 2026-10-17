@@ -1,4 +1,4 @@
-# pgwatch-ai — Instalação do Cliente
+# pgwho — Instalação do Cliente
 
 Monitoramento de PostgreSQL com inteligência artificial.
 
@@ -14,12 +14,12 @@ Monitoramento de PostgreSQL com inteligência artificial.
 Execute em qualquer terminal com Docker instalado:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/wislanmoraes/pgwatchai-client/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/wislanmoraes/pgwho-client/main/install.sh | bash
 ```
 
 O instalador irá:
 1. Verificar os pré-requisitos
-2. Criar o diretório `~/pgwatchai`
+2. Criar o diretório `~/pgwho`
 3. Solicitar o token de acesso (`GHCR_TOKEN`)
 4. Gerar senha do banco e chave de segurança automaticamente
 5. Subir todos os containers
@@ -32,7 +32,7 @@ Quando uma nova versão estiver disponível, um badge verde aparecerá na interf
 Clique em **Atualizar agora** ou execute no servidor:
 
 ```bash
-cd ~/pgwatchai && ./update.sh
+cd ~/pgwho && ./update.sh
 ```
 
 A cada execução, o script realiza automaticamente:
@@ -48,7 +48,7 @@ Em atualizações que exijam apagar os dados históricos (ex: mudança de versã
 execute o instalador novamente — ele detectará a instalação existente e oferecerá a opção de reinstalar:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/wislanmoraes/pgwatchai-client/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/wislanmoraes/pgwho-client/main/install.sh | bash
 ```
 
 Escolha a opção **[2] Reinstalação limpa** no menu. Os dados de monitoramento serão apagados,
@@ -57,7 +57,7 @@ mas o arquivo `.env` (token, senhas, porta) é preservado — não é necessári
 Para ambientes automatizados (sem prompt interativo):
 
 ```bash
-PGWATCH_FRESH=1 curl -fsSL https://raw.githubusercontent.com/wislanmoraes/pgwatchai-client/main/install.sh | bash
+PGWHO_FRESH=1 curl -fsSL https://raw.githubusercontent.com/wislanmoraes/pgwho-client/main/install.sh | bash
 ```
 
 ## Suporte

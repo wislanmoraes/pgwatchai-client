@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────────────
-#  pgwatch-ai — Instalação inicial
+#  pgwho — Instalação inicial
 #
 #  Uso (em qualquer VM com Docker):
-#    curl -fsSL https://raw.githubusercontent.com/wislanmoraes/pgwatchai-client/main/install.sh | bash
+#    curl -fsSL https://raw.githubusercontent.com/wislanmoraes/pgwho-client/main/install.sh | bash
 #
 #  O script:
 #    1. Verifica pré-requisitos (Docker, Docker Compose, curl)
-#    2. Cria arquivos no diretório atual  (ou $PGWATCH_DIR se definido)
+#    2. Cria arquivos no diretório atual  (ou $PGWHO_DIR se definido)
 #    3. Baixa docker-compose.client.yml e update.sh
 #    4. Coleta configurações interativamente (com padrões inteligentes)
 #    5. Faz login no GHCR e sobe os containers
@@ -15,8 +15,8 @@
 
 set -euo pipefail
 
-BASE_URL="https://raw.githubusercontent.com/wislanmoraes/pgwatchai-client/main"
-INSTALL_DIR="${PGWATCH_DIR:-$PWD}"
+BASE_URL="https://raw.githubusercontent.com/wislanmoraes/pgwho-client/main"
+INSTALL_DIR="${PGWHO_DIR:-${PGWATCH_DIR:-$PWD}}"
 
 GREEN="\033[0;32m"; YELLOW="\033[1;33m"; RED="\033[0;31m"; CYAN="\033[0;36m"; DIM="\033[2m"; RESET="\033[0m"
 info()    { echo -e "${GREEN}[INFO]${RESET}  $*"; }
@@ -60,12 +60,12 @@ port_in_use() {
 # ── Banner ────────────────────────────────────────────────────────────────────
 
 echo -e "${CYAN}"
-echo "  ██████╗  ██████╗ ██╗    ██╗ █████╗ ████████╗ ██████╗██╗  ██╗      █████╗ ██╗"
-echo "  ██╔══██╗██╔════╝ ██║    ██║██╔══██╗╚══██╔══╝██╔════╝██║  ██║     ██╔══██╗██║"
-echo "  ██████╔╝██║  ███╗██║ █╗ ██║███████║   ██║   ██║     ███████║     ███████║██║"
-echo "  ██╔═══╝ ██║   ██║██║███╗██║██╔══██║   ██║   ██║     ██╔══██║     ██╔══██║██║"
-echo "  ██║     ╚██████╔╝╚███╔███╔╝██║  ██║   ██║   ╚██████╗██║  ██║     ██║  ██║██║"
-echo "  ╚═╝      ╚═════╝  ╚══╝╚══╝ ╚═╝  ╚═╝   ╚═╝    ╚═════╝╚═╝  ╚═╝     ╚═╝  ╚═╝╚═╝"
+echo "  ██████╗  ██████╗ ██╗    ██╗██╗  ██╗ ██████╗ "
+echo "  ██╔══██╗██╔════╝ ██║    ██║██║  ██║██╔═══██╗"
+echo "  ██████╔╝██║  ███╗██║ █╗ ██║███████║██║   ██║"
+echo "  ██╔═══╝ ██║   ██║██║███╗██║██╔══██║██║   ██║"
+echo "  ██║     ╚██████╔╝╚███╔███╔╝██║  ██║╚██████╔╝"
+echo "  ╚═╝      ╚═════╝  ╚══╝╚══╝ ╚═╝  ╚═╝ ╚═════╝ "
 echo -e "${RESET}"
 echo -e "  Instalação inicial — PostgreSQL Monitoring with AI\n"
 
@@ -120,16 +120,16 @@ EXISTING_CONTAINERS=$(docker compose -f docker-compose.client.yml ps --quiet 2>/
 if [[ -n "$EXISTING_CONTAINERS" ]] || docker volume ls --quiet 2>/dev/null | grep -q "timescaledb_data"; then
   section "Instalação existente detectada"
 
-  if [[ "${PGWATCH_FRESH:-0}" == "1" ]]; then
+  if [[ "${PGWHO_FRESH:-${PGWATCH_FRESH:-0}}" == "1" ]]; then
     REINSTALL=1
   else
-    echo -e "  O pgwatch-ai já está instalado neste servidor."
+    echo -e "  O pgwho já está instalado neste servidor."
     echo ""
     echo -e "  ${CYAN}[1]${RESET} Atualização normal    — mantém dados históricos de monitoramento"
     echo -e "  ${CYAN}[2]${RESET} Reinstalação limpa    — ${RED}APAGA${RESET} dados de monitoramento e recria do zero"
     echo -e "       ${DIM}(targets, usuários e alertas configurados são preservados)${RESET}"
     echo ""
-    echo -e "  ${DIM}Dica: passe PGWATCH_FRESH=1 antes do curl para forçar reinstalação sem prompt.${RESET}"
+    echo -e "  ${DIM}Dica: passe PGWHO_FRESH=1 antes do curl para forçar reinstalação sem prompt.${RESET}"
     echo ""
     read -rp "  Escolha [1]: " INSTALL_CHOICE </dev/tty
     INSTALL_CHOICE="${INSTALL_CHOICE:-1}"
@@ -139,10 +139,12 @@ if [[ -n "$EXISTING_CONTAINERS" ]] || docker volume ls --quiet 2>/dev/null | gre
   if [[ "${REINSTALL:-0}" == "1" ]]; then
     warn "Removendo instalação anterior (containers + volumes)..."
     docker compose -f docker-compose.client.yml down -v 2>/dev/null || true
+    docker rm -f pgwatch_backend pgwatch_watchshell pgwatch_db pgwatch_frontend pgwatch_updater 2>/dev/null || true
+    docker volume rm pgwatchai_timescaledb_data pgwho_timescaledb_data 2>/dev/null || true
 
-    warn "Removendo imagens antigas do pgwatch-ai..."
+    warn "Removendo imagens antigas do pgwho..."
     docker images --format '{{.Repository}}:{{.Tag}} {{.ID}}' \
-      | grep 'ghcr.io/wislanmoraes/pgwatchai' \
+      | grep -E 'ghcr.io/wislanmoraes/(pgwho|pgwatchai)' \
       | awk '{print $2}' \
       | xargs -r docker rmi -f 2>/dev/null || true
 
@@ -172,7 +174,7 @@ else
   echo ""
   echo -e "  Pressione ${CYAN}Enter${RESET} para aceitar o valor padrão indicado em ${CYAN}[colchetes]${RESET}."
   echo ""
-  echo -e "  ${DIM}pgwatch-ai será instalado em: ${CYAN}${INSTALL_DIR}${RESET}"
+  echo -e "  ${DIM}pgwho será instalado em: ${CYAN}${INSTALL_DIR}${RESET}"
   echo -e "  ${DIM}(para instalar em outro local: cd /outro/diretorio && curl ... | bash)${RESET}"
   echo ""
 
@@ -221,8 +223,8 @@ else
 
   cat > .env <<EOF
 # ── Banco de dados ────────────────────────────────────────────────────────────
-DB_USER=pgwatch
-DB_NAME=pgwatch_ai
+DB_USER=pgwho
+DB_NAME=pgwho
 DB_PASSWORD=${DB_PASSWORD_GEN}
 
 # ── Segurança ─────────────────────────────────────────────────────────────────
@@ -262,7 +264,7 @@ PORTA=$(grep -E '^FRONTEND_PORT=' .env 2>/dev/null | cut -d= -f2 || echo "80")
 IP=$(hostname -I | awk '{print $1}')
 
 echo ""
-echo -e "  ${GREEN}✅ pgwatch-ai instalado com sucesso!${RESET}"
+echo -e "  ${GREEN}✅ pgwho instalado com sucesso!${RESET}"
 echo ""
 echo -e "  Acesse:       ${CYAN}http://${IP}:${PORTA}${RESET}"
 echo -e "  Login padrão: ${CYAN}admin / admin${RESET}  ← troque a senha após o primeiro acesso"
