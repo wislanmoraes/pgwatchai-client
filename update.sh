@@ -139,9 +139,22 @@ fi
 # ── Preservação automática de volume (migração pgwatchai -> pgwho) ────────────
 if [[ -z "${DATA_VOLUME_NAME:-}" ]] && docker volume inspect pgwatchai_timescaledb_data >/dev/null 2>&1; then
   export DATA_VOLUME_NAME="pgwatchai_timescaledb_data"
-  if [[ -f "$SCRIPT_DIR/.env" ]] && ! grep -q '^DATA_VOLUME_NAME=' "$SCRIPT_DIR/.env"; then
-    echo "DATA_VOLUME_NAME=pgwatchai_timescaledb_data" >> "$SCRIPT_DIR/.env"
+  export DB_USER="${DB_USER:-pgwatch}"
+  export DB_NAME="${DB_NAME:-pgwatch_ai}"
+  if [[ -w "$SCRIPT_DIR/.env" ]]; then
+    if ! grep -q '^DATA_VOLUME_NAME=' "$SCRIPT_DIR/.env"; then
+      echo "DATA_VOLUME_NAME=pgwatchai_timescaledb_data" >> "$SCRIPT_DIR/.env"
+    fi
+    if ! grep -q '^DB_USER=' "$SCRIPT_DIR/.env"; then
+      echo "DB_USER=$DB_USER" >> "$SCRIPT_DIR/.env"
+    fi
+    if ! grep -q '^DB_NAME=' "$SCRIPT_DIR/.env"; then
+      echo "DB_NAME=$DB_NAME" >> "$SCRIPT_DIR/.env"
+    fi
     info "Volume legado (pgwatchai_timescaledb_data) detectado e preservado no .env."
+  elif [[ -w "$SCRIPT_DIR/$COMPOSE_FILE" ]]; then
+    sed -i 's/pgwho_timescaledb_data/pgwatchai_timescaledb_data/g' "$SCRIPT_DIR/$COMPOSE_FILE" 2>/dev/null || true
+    info "Volume legado (pgwatchai_timescaledb_data) detectado e preservado no compose."
   fi
 fi
 
@@ -188,26 +201,14 @@ docker compose -f "$COMPOSE_FILE" up -d --no-recreate --remove-orphans
 # aplicam sozinhas — historicamente exigiam um `docker compose up -d
 # --force-recreate updater` manual depois de toda atualização normal.
 #
-# Um "nohup/disown" comum não resolve: mata o processo pai, não o container —
-# e o container_name fixo (pgwho_updater) obriga o Docker a parar/remover
-# ESTE container antes de criar o novo com o mesmo nome, matando qualquer
-# processo em background que ainda esteja dentro dele. A solução é delegar a
-# recriação a um container auxiliar descartável, completamente separado
-# deste (fala com o dockerd do host via socket, não depende do namespace
-# deste container pra sobreviver).
-#
-# Precisa de HOST_DEPLOY_DIR (o caminho REAL no host, não o /deploy interno
-# deste container) por dois motivos:
-#   1. o volume do auxiliar precisa apontar pro conteúdo de verdade;
-#   2. crucial: o auxiliar precisa montar esse caminho como working_dir
-#      usando A MESMA STRING que existe no host (não remapeado pra /deploy) —
-#      senão o `docker compose` que ele roda por dentro resolve os mounts
-#      relativos do compose (./.env, etc.) contra o PRÓPRIO cwd do processo,
-#      que o dockerd do host então tentaria interpretar nesse mesmo caminho
-#      NO HOST. Se não bater com a string real, ele monta um diretório vazio
-#      (ou falha, dependendo do SO) em vez do deploy de verdade. Testado e
-#      confirmado manualmente antes de ir pra produção.
-if [[ -z "${HOST_DEPLOY_DIR:-}" ]]; then
+# Se executado diretamente no terminal do host (! -f /.dockerenv), podemos
+# recriar o updater diretamente. Se executado de dentro do sidecar updater,
+# delegamos a um container auxiliar descartável usando HOST_DEPLOY_DIR.
+if [[ ! -f /.dockerenv ]]; then
+  info "Recriando serviço updater no host..."
+  docker rm -f pgwatch_updater 2>/dev/null || true
+  docker compose -f "$COMPOSE_FILE" up -d --force-recreate --no-deps updater
+elif [[ -z "${HOST_DEPLOY_DIR:-}" ]]; then
   warn "HOST_DEPLOY_DIR não definido — pulando auto-recriação do updater."
   warn "Instalações antigas (de antes desta variável existir) precisam de:"
   warn "  docker compose -f $COMPOSE_FILE up -d --force-recreate updater"
